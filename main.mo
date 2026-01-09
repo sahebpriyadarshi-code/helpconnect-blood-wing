@@ -966,6 +966,145 @@ actor {
         Runtime.trap("Blood request not found");
       };
     };
+
+  //------------------------------
+  // Auto-Matching Functions
+  //------------------------------
+  public query ({ caller }) func getCompatibleDonorsInLocation(
+    bloodType : BloodType.BloodType,
+    location : Text
+  ) : async [DonorSummary] {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can search for donors");
+    };
+    
+    let result = List.empty<DonorSummary>();
+    for (donor in donors.values()) {
+      if (donor.bloodType == bloodType and 
+          donor.location == location and 
+          donor.availability) {
+        let summary : DonorSummary = {
+          firstName = donor.name;
+          bloodType = donor.bloodType;
+          location = donor.location;
+          donorId = donor.id;
+        };
+        result.add(summary);
+      };
+    };
+    result.toArray();
+  };
+
+  public shared ({ caller }) func autoMatchBloodRequest(
+    requestId : Text
+  ) : async [DonorSummary] {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can trigger auto-matching");
+    };
+    
+    switch (bloodRequests.get(requestId)) {
+      case (?request) {
+        if (request.owner != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+          Runtime.trap("Unauthorized: Can only auto-match your own requests");
+        };
+        
+        let compatibleTypes = getCompatibleDonorBloodTypes(request.bloodType);
+        let matchedDonors = List.empty<DonorSummary>();
+        
+        for (donor in donors.values()) {
+          let isCompatible = compatibleTypes.find(
+            func(bt) { bt == donor.bloodType }
+          ) != null;
+          
+          if (isCompatible and 
+              donor.location == request.location and 
+              donor.availability) {
+            
+            let alreadyContacted = donorInterests.values().find(
+              func(interest) { 
+                interest.requestId == requestId and interest.donorId == donor.id 
+              }
+            ) != null;
+            
+            if (not alreadyContacted) {
+              let summary : DonorSummary = {
+                firstName = donor.name;
+                bloodType = donor.bloodType;
+                location = donor.location;
+                donorId = donor.id;
+              };
+              matchedDonors.add(summary);
+            };
+          };
+        };
+        
+        matchedDonors.toArray();
+      };
+      case (null) {
+        Runtime.trap("Blood request not found");
+      };
+    };
+  };
+
+  public shared ({ caller }) func findBestDonorMatch(
+    requestId : Text
+  ) : async ?DonorContactResponse {
+    if (not AccessControl.hasPermission(accessControlState, caller, #user)) {
+      Runtime.trap("Unauthorized: Only users can find donor matches");
+    };
+    
+    switch (bloodRequests.get(requestId)) {
+      case (?request) {
+        if (request.owner != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+          Runtime.trap("Unauthorized");
+        };
+        
+        let compatibleTypes = getCompatibleDonorBloodTypes(request.bloodType);
+        var bestDonor : ?Donor = null;
+        var bestScore : Nat = 0;
+        
+        for (donor in donors.values()) {
+          let isCompatible = compatibleTypes.find(
+            func(bt) { bt == donor.bloodType }
+          ) != null;
+          
+          if (isCompatible and donor.location == request.location and donor.availability) {
+            let alreadyContacted = donorInterests.values().find(
+              func(interest) { interest.requestId == requestId and interest.donorId == donor.id }
+            ) != null;
+            
+            if (not alreadyContacted) {
+              var score : Nat = 0;
+              if (donor.bloodType == request.bloodType) score += 10;
+              if (donor.healthChecklist.eligibleToDonate) score += 5;
+              
+              if (score > bestScore) {
+                bestScore := score;
+                bestDonor := ?donor;
+              };
+            };
+          };
+        };
+        
+        switch (bestDonor) {
+          case (?donor) {
+            ?{
+              donorSummary = {
+                firstName = donor.name;
+                bloodType = donor.bloodType;
+                location = donor.location;
+                donorId = donor.id;
+              };
+              contactInfo = donor.contactInfo;
+            };
+          };
+          case (null) { null };
+        };
+      };
+      case (null) { null };
+    };
+  };
+
   };
 };
 
