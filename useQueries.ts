@@ -255,5 +255,30 @@ export function useConfirmDonorMatch() {
       queryClient.invalidateQueries({ queryKey: ['bloodRequests'] });
       queryClient.invalidateQueries({ queryKey: ['interestedDonors'] });
     },
+  
+  
+  export function useAutoMatchBloodRequest() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (requestId: string) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.autoMatchBloodRequest(requestId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bloodRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['donorInterests'] });
+    },
   });
+}
+
+export function useFindBestDonorMatch() {
+  const { actor } = useActor();
+  return useMutation({
+    mutationFn: async (requestId: string) => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.findBestDonorMatch(requestId);
+    },
+  });
+}});
 }
