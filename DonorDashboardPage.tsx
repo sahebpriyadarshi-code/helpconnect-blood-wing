@@ -30,6 +30,22 @@ const URGENCY_COLORS: Record<string, string> = {
   moderate: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20',
 };
 
+// Blood type donation compatibility rules
+const BLOOD_TYPE_COMPATIBILITY: Record<string, string[]> = {
+  'O+': ['O+', 'A+', 'B+', 'AB+', 'O-', 'A-', 'B-', 'AB-'], // Universal donor
+  'O-': ['O+', 'A+', 'B+', 'AB+', 'O-', 'A-', 'B-', 'AB-'], // Universal donor
+  'A+': ['A+', 'AB+', 'A-', 'AB-'],
+  'A-': ['A+', 'AB+', 'A-', 'AB-'],
+  'B+': ['B+', 'AB+', 'B-', 'AB-'],
+  'B-': ['B+', 'AB+', 'B-', 'AB-'],
+  'AB+': ['AB+'],
+  'AB-': ['AB-', 'AB+'],
+};
+
+const canDonate = (donorBlood: string, recipientBlood: string): boolean => {
+  return BLOOD_TYPE_COMPATIBILITY[donorBlood]?.includes(recipientBlood) ?? false;
+};
+
 const RESPONSE_COOLDOWN_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 const RESPONSE_THRESHOLD = 5; // Show message after 5 responses
 
@@ -191,7 +207,9 @@ export default function DonorDashboardPage() {
 
   const bloodTypeLabel = BLOOD_TYPE_LABELS[currentDonor.bloodType.toString()] || currentDonor.bloodType.toString();
 
-  const filteredRequests = allRequests?.filter((request) => {
+  if (request.bloodType.toString() !== currentDonor.bloodType.toString()) return false;  const donorBloodLabel = BLOOD_TYPE_LABELS[currentDonor.bloodType.toString()] || currentDonor.bloodType.toString();
+  const recipientBloodLabel = BLOOD_TYPE_LABELS[request.bloodType.toString()] || request.bloodType.toString();
+  if (!canDonate(donorBloodLabel, recipientBloodLabel)) return false;const filteredRequests = allRequests?.filter((request) => {
     if (request.status.toString() !== RequestStatus.pending && request.status.toString() !== RequestStatus.searching && request.status.toString() !== RequestStatus.donor_contacted) return false;
     if (request.location.toLowerCase() !== currentDonor.location.toLowerCase()) return false;
     if (request.bloodType.toString() !== currentDonor.bloodType.toString()) return false;
