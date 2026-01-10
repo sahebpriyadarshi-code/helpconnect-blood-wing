@@ -1,0 +1,75 @@
+{
+  "name": "helpconnect-blood-wing",
+  "version": "1.0.0",
+  "description": "Emergency blood coordination system - HelpConnect",
+  "private": true,
+  "author": "sahebpriyadarshi-code",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "vite",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext ts,tsx",
+    "format": "prettier --write 'src/**/*.{ts,tsx,css,json}'",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0",
+    "@tanstack/react-query": "^5.25.0",
+    "@tanstack/react-query-devtools": "^5.25.0",
+    "axios": "^1.6.2",
+    "lucide-react": "^0.309.0",
+    "clsx": "^2.0.0",
+    "uuid": "^9.0.0",
+    "date-fns": "^2.30.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@types/node": "^20.10.5",
+    "@types/uuid": "^9.0.7",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8",
+    "@vitejs/plugin-react": "^4.2.1",
+    "tailwindcss": "^3.4.1",
+    "postcss": "^8.4.32",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.55.0",
+    "@typescript-eslint/eslint-plugin": "^6.14.0",
+    "@typescript-eslint/parser": "^6.14.0",
+    "prettier": "^3.1.1",
+    "vitest": "^1.1.0",
+    "@testing-library/react": "^14.1.2",
+    "@testing-library/jest-dom": "^6.1.5"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sahebpriyadarshi-code/helpconnect-blood-wing.git"
+  },
+  "keywords": [
+    "blood",
+    "donation",
+    "emergency",
+    "healthcare",
+    "donor",
+    "matching",
+    "decentralized",
+    "internet-computer"
+  ],
+  "bugs": {
+    "url": "https://github.com/sahebpriyadarshi-code/helpconnect-blood-wing/issues"
+  },
+  "homepage": "https://github.com/sahebpriyadarshi-code/helpconnect-blood-wing#readme"
+}
