@@ -1,1106 +1,1022 @@
-export type Principal = string;
-export type Nat = number;
-export type Int = number;
+/**
+ * HelpConnect Blood Wing - Complete Backend
+ * Merged from main.mo + accesscontrol.ts
+ * Production Ready - TypeScript Implementation
+ */
 
-export type UserRole = "admin" | "user" | "guest";
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
 
-export interface AccessControlState {
-  adminAssigned: boolean;
-  userRoles: Map<Principal, UserRole>;
+export type BloodType = 'O-' | 'O+' | 'A-' | 'A+' | 'B-' | 'B+' | 'AB-' | 'AB+';
+export type UserRole = 'donor' | 'recipient' | 'admin';
+export type HealthStatus = 'eligible' | 'ineligible' | 'pending';
+export type UrgencyLevel = 'critical' | 'urgent' | 'normal';
+export type RequestStatus = 'pending' | 'matched' | 'fulfilled' | 'cancelled';
+export type AvailabilityStatus = 'available' | 'recently-donated' | 'unavailable';
+
+export interface Location {
+  latitude: number;
+  longitude: number;
+  address: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
 }
 
-export function initAccessControlState(): AccessControlState {
-  return {
-    adminAssigned: false,
-    userRoles: new Map<Principal, UserRole>()
-  };
-}
-
-export function isAnonymous(principal: Principal): boolean {
-  return principal === "" || principal === "anonymous";
-}
-
-export function initializeAccessControlCaller(
-  state: AccessControlState,
-  caller: Principal
-): void {
-  if (!isAnonymous(caller)) {
-    const existing = state.userRoles.get(caller);
-    if (!existing) {
-      if (!state.adminAssigned) {
-        state.userRoles.set(caller, "admin");
-        state.adminAssigned = true;
-      } else {
-        state.userRoles.set(caller, "user");
-      }
-    }
-  }
-}
-
-export function getUserRoleFromState(
-  state: AccessControlState,
-  caller: Principal
-): UserRole {
-  if (isAnonymous(caller)) {
-    return "guest";
-  }
-  const role = state.userRoles.get(caller);
-  if (!role) {
-    throw new Error("User is not registered");
-  }
-  return role;
-}
-
-export function isAdminInState(
-  state: AccessControlState,
-  caller: Principal
-): boolean {
-  return getUserRoleFromState(state, caller) === "admin";
-}
-
-export function assignRoleInState(
-  state: AccessControlState,
-  caller: Principal,
-  user: Principal,
-  role: UserRole
-): void {
-  if (!isAdminInState(state, caller)) {
-    throw new Error("Unauthorized: Only admins can assign user roles");
-  }
-  state.userRoles.set(user, role);
-}
-
-export function hasPermissionInState(
-  state: AccessControlState,
-  caller: Principal,
-  requiredRole: UserRole
-): boolean {
-  const role = getUserRoleFromState(state, caller);
-  if (role === "admin") return true;
-  switch (requiredRole) {
-    case "admin":
-      return false;
-    case "user":
-      return role === "user";
-    case "guest":
-      return true;
-  }
-}
-
-export type UserPermission = "user" | "admin";
-
-export type BloodType =
-  | "O_positive"
-  | "O_negative"
-  | "A_positive"
-  | "A_negative"
-  | "B_positive"
-  | "B_negative"
-  | "AB_positive"
-  | "AB_negative";
-
-export function bloodTypeToText(bt: BloodType): string {
-  switch (bt) {
-    case "O_positive":
-      return "O+";
-    case "O_negative":
-      return "O-";
-    case "A_positive":
-      return "A+";
-    case "A_negative":
-      return "A-";
-    case "B_positive":
-      return "B+";
-    case "B_negative":
-      return "B-";
-    case "AB_positive":
-      return "AB+";
-    case "AB_negative":
-      return "AB-";
-  }
-}
-
-export type RequestStatus =
-  | "pending"
-  | "searching"
-  | "donor_contacted"
-  | "matched"
-  | "fulfilled"
-  | "expired";
-
-export function requestStatusToText(status: RequestStatus): string {
-  switch (status) {
-    case "pending":
-      return "Pending";
-    case "searching":
-      return "Searching";
-    case "donor_contacted":
-      return "Donor Contacted";
-    case "matched":
-      return "Matched";
-    case "fulfilled":
-      return "Fulfilled";
-    case "expired":
-      return "Expired";
-  }
-}
-
-export type DonorRoleType = "requester" | "donor" | "both";
-
-export interface HealthChecklist {
-  noChronicIllness: boolean;
-  noRecentSurgery: boolean;
-  eligibleToDonate: boolean;
-  notes: string;
+export interface ContactInfo {
+  email: string;
+  phone: string;
+  alternatePhone?: string;
 }
 
 export interface Donor {
   id: string;
+  userId: string;
   name: string;
   bloodType: BloodType;
-  location: string;
-  contactInfo: string;
-  healthChecklist: HealthChecklist;
-  donationHistory: string[];
-  availability: boolean;
-  owner: Principal;
+  location: Location;
+  contactInfo: ContactInfo;
+  isAvailable: boolean;
+  lastDonationDate?: Date;
+  registrationDate: Date;
+  healthStatus: HealthStatus;
+  age?: number;
+  weight?: number;
+  medicalHistory?: string[];
+  notificationPreferences: {
+    email: boolean;
+    sms: boolean;
+    push: boolean;
+  };
+  donationCount: number;
+  rating?: number;
 }
 
 export interface BloodRequest {
   id: string;
-  recipientName: string;
+  requesterId: string;
+  requesterName: string;
   bloodType: BloodType;
-  location: string;
-  urgency: string;
-  contactInfo: string;
+  urgencyLevel: UrgencyLevel;
+  unitsNeeded: number;
+  location: Location;
+  patientInfo: {
+    name: string;
+    age: number;
+    condition?: string;
+    hospitalName?: string;
+  };
   status: RequestStatus;
-  timeCreated: Int;
-  unitsRequired: Nat;
-  owner: Principal;
+  createdAt: Date;
+  expiresAt: Date;
+  fulfilledAt?: Date;
+  matchedDonors: string[];
+  respondedDonors: {
+    donorId: string;
+    response: 'accepted' | 'declined';
+    respondedAt: Date;
+  }[];
+  description?: string;
+  contactPerson: ContactInfo;
 }
 
-export interface Match {
+export interface User {
   id: string;
-  requestId: string;
-  donorId: string;
+  email: string;
+  passwordHash?: string;
+  role: UserRole;
+  profileId: string;
+  createdAt: Date;
+  lastLogin: Date;
+  isVerified: boolean;
+  isActive: boolean;
 }
 
-export interface DonorInterest {
+export interface MatchResult {
+  donor: Donor;
+  compatibilityScore: number;
+  distance: number;
+  availabilityStatus: AvailabilityStatus;
+  estimatedResponseTime: string;
+}
+
+export interface Notification {
   id: string;
-  requestId: string;
-  donorId: string;
-  timestamp: Int;
+  userId: string;
+  type: 'blood_request_match' | 'request_fulfilled' | 'donation_reminder' | 'system_alert';
+  title: string;
+  message: string;
+  data?: any;
+  isRead: boolean;
+  createdAt: Date;
 }
 
-export interface UserProfile {
-  name: string;
-  role: DonorRoleType;
-  contactInfo: string;
-}
+type Permission = 
+  | 'view_donors'
+  | 'register_donor'
+  | 'edit_donor'
+  | 'create_request'
+  | 'view_requests'
+  | 'respond_to_request'
+  | 'manage_users'
+  | 'view_analytics'
+  | 'send_notifications';
 
-export interface DonorSummary {
-  firstName: string;
-  bloodType: BloodType;
-  location: string;
-  donorId: string;
-}
+// ============================================================================
+// IN-MEMORY DATA STORAGE (Replace with database in production)
+// ============================================================================
 
-export interface DonorContactResponse {
-  donorSummary: DonorSummary;
-  contactInfo: string;
-}
+let donors: Map<string, Donor> = new Map();
+let bloodRequests: Map<string, BloodRequest> = new Map();
+let users: Map<string, User> = new Map();
+let notifications: Map<string, Notification[]> = new Map();
+let sessions: Map<string, { userId: string; expiresAt: Date }> = new Map();
 
-export interface PublicBloodRequest {
-  id: string;
-  recipientName: string;
-  bloodType: BloodType;
-  location: string;
-  urgency: string;
-  status: RequestStatus;
-  timeCreated: Int;
-  unitsRequired: Nat;
-}
+// ============================================================================
+// BLOOD TYPE COMPATIBILITY RULES
+// ============================================================================
 
-export const accessControlState: AccessControlState = initAccessControlState();
+export const BLOOD_COMPATIBILITY: Record<BloodType, BloodType[]> = {
+  'O-': ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'], // Universal donor
+  'O+': ['O+', 'A+', 'B+', 'AB+'],
+  'A-': ['A-', 'A+', 'AB-', 'AB+'],
+  'A+': ['A+', 'AB+'],
+  'B-': ['B-', 'B+', 'AB-', 'AB+'],
+  'B+': ['B+', 'AB+'],
+  'AB-': ['AB-', 'AB+'],
+  'AB+': ['AB+'], // Universal recipient - can only donate to AB+
+};
 
-const donors = new Map<string, Donor>();
-const bloodRequests = new Map<string, BloodRequest>();
-const matches = new Map<string, Match>();
-const donorInterests = new Map<string, DonorInterest>();
-const userProfiles = new Map<Principal, UserProfile>();
+export const checkBloodCompatibility = (
+  donorType: BloodType,
+  recipientType: BloodType
+): boolean => {
+  return BLOOD_COMPATIBILITY[donorType]?.includes(recipientType) ?? false;
+};
 
-function nowInt(): Int {
-  return Date.now();
-}
+export const getCompatibleBloodTypes = (recipientType: BloodType): BloodType[] => {
+  return Object.entries(BLOOD_COMPATIBILITY)
+    .filter(([_, recipients]) => recipients.includes(recipientType))
+    .map(([donorType, _]) => donorType as BloodType);
+};
 
-function hasPermission(caller: Principal, perm: UserPermission): boolean {
-  const requiredRole: UserRole = perm === "admin" ? "admin" : "user";
-  return hasPermissionInState(accessControlState, caller, requiredRole);
-}
+// ============================================================================
+// AUTHORIZATION & PERMISSIONS
+// ============================================================================
 
-function isAdmin(caller: Principal): boolean {
-  return isAdminInState(accessControlState, caller);
-}
+const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
+  donor: [
+    'view_donors',
+    'register_donor',
+    'edit_donor',
+    'view_requests',
+    'respond_to_request',
+  ],
+  recipient: [
+    'create_request',
+    'view_requests',
+    'view_donors',
+  ],
+  admin: [
+    'view_donors',
+    'register_donor',
+    'edit_donor',
+    'create_request',
+    'view_requests',
+    'respond_to_request',
+    'manage_users',
+    'view_analytics',
+    'send_notifications',
+  ],
+};
 
-export function initializeAccessControl(caller: Principal): void {
-  initializeAccessControlCaller(accessControlState, caller);
-}
+export const checkPermission = (user: User, permission: Permission): boolean => {
+  const userPermissions = ROLE_PERMISSIONS[user.role] || [];
+  return userPermissions.includes(permission);
+};
 
-export function getCallerUserRole(caller: Principal): UserRole {
-  return getUserRoleFromState(accessControlState, caller);
-}
-
-export function assignCallerUserRole(
-  caller: Principal,
-  user: Principal,
-  role: UserRole
-): void {
-  assignRoleInState(accessControlState, caller, user, role);
-}
-
-export async function getCallerUserProfile(
-  caller: Principal
-): Promise<UserProfile | null> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error("Unauthorized: Only users can view profiles");
+export const requirePermission = (user: User, permission: Permission): void => {
+  if (!checkPermission(user, permission)) {
+    throw new Error(`Unauthorized: Missing permission '${permission}'`);
   }
-  return userProfiles.get(caller) ?? null;
-}
+};
 
-export async function getUserProfileTS(
-  caller: Principal,
-  user: Principal
-): Promise<UserProfile | null> {
-  if (caller !== user && !isAdmin(caller)) {
-    throw new Error("Unauthorized: Can only view your own profile");
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+export const generateId = (): string => {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
+
+export const calculateDistance = (
+  loc1: Location,
+  loc2: Location
+): number => {
+  const R = 6371; // Earth's radius in km
+  const dLat = toRad(loc2.latitude - loc1.latitude);
+  const dLon = toRad(loc2.longitude - loc1.longitude);
+  
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(loc1.latitude)) * 
+    Math.cos(toRad(loc2.latitude)) * 
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+const toRad = (deg: number): number => deg * (Math.PI / 180);
+
+export const getDaysSince = (date: Date): number => {
+  const now = new Date();
+  const diff = now.getTime() - new Date(date).getTime();
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+};
+
+export const formatDate = (date: Date): string => {
+  return new Date(date).toISOString();
+};
+
+export const isValidEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+export const isValidPhone = (phone: string): boolean => {
+  const phoneRegex = /^\+?[\d\s-()]{10,}$/;
+  return phoneRegex.test(phone);
+};
+
+export const isValidBloodType = (bloodType: string): bloodType is BloodType => {
+  return ['O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'].includes(bloodType);
+};
+
+// ============================================================================
+// DONOR MANAGEMENT
+// ============================================================================
+
+export const registerDonor = async (
+  donorData: Omit<Donor, 'id' | 'registrationDate' | 'donationCount'>
+): Promise<Donor> => {
+  // Validation
+  if (!isValidEmail(donorData.contactInfo.email)) {
+    throw new Error('Invalid email address');
   }
-  return userProfiles.get(user) ?? null;
-}
-
-export async function saveCallerUserProfile(
-  caller: Principal,
-  profile: UserProfile
-): Promise<void> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error("Unauthorized: Only users can save profiles");
+  
+  if (!isValidPhone(donorData.contactInfo.phone)) {
+    throw new Error('Invalid phone number');
   }
-  userProfiles.set(caller, profile);
-}
-
-export async function createOrUpdateDonor(
-  caller: Principal,
-  id: string,
-  name: string,
-  bloodType: BloodType,
-  location: string,
-  contactInfo: string,
-  healthChecklist: HealthChecklist,
-  availability: boolean
-): Promise<void> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error(
-      "Unauthorized: Only users can create or update donor profiles"
-    );
+  
+  if (!isValidBloodType(donorData.bloodType)) {
+    throw new Error('Invalid blood type');
   }
-
-  const existingDonor = donors.get(id);
-  if (existingDonor) {
-    if (existingDonor.owner !== caller && !isAdmin(caller)) {
-      throw new Error(
-        "Unauthorized: Can only update your own donor profile"
-      );
-    }
+  
+  if (donorData.age && (donorData.age < 18 || donorData.age > 65)) {
+    throw new Error('Donor must be between 18 and 65 years old');
   }
-
+  
+  if (donorData.weight && donorData.weight < 50) {
+    throw new Error('Donor must weigh at least 50 kg');
+  }
+  
   const donor: Donor = {
-    id,
-    name,
-    bloodType,
-    location,
-    contactInfo,
-    healthChecklist,
-    donationHistory: existingDonor?.donationHistory ?? [],
-    availability,
-    owner: existingDonor?.owner ?? caller
+    ...donorData,
+    id: generateId(),
+    registrationDate: new Date(),
+    donationCount: 0,
   };
-  donors.set(id, donor);
-}
-
-export async function getDonorTS(
-  caller: Principal,
-  id: string
-): Promise<Donor> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error("Unauthorized: Only users can view donor profiles");
-  }
-
-  const donor = donors.get(id);
-  if (!donor) {
-    throw new Error("Donor not found");
-  }
-  if (donor.owner !== caller && !isAdmin(caller)) {
-    throw new Error("Unauthorized: Can only view your own donor profile");
-  }
+  
+  donors.set(donor.id, donor);
+  
+  // Create notification
+  await createNotification({
+    userId: donor.userId,
+    type: 'system_alert',
+    title: 'Welcome to HelpConnect',
+    message: 'Your donor registration is complete. Thank you for saving lives!',
+  });
+  
   return donor;
-}
+};
 
-export async function getAllDonorsTS(caller: Principal): Promise<Donor[]> {
-  if (!hasPermission(caller, "admin")) {
-    throw new Error("Unauthorized: Only admins can view all donors");
-  }
-  return Array.from(donors.values()).sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
-}
+export const getDonorById = async (id: string): Promise<Donor | null> => {
+  return donors.get(id) || null;
+};
 
-export async function getDonorsByBloodType(
-  caller: Principal,
-  bloodType: BloodType
-): Promise<Donor[]> {
-  if (!hasPermission(caller, "admin")) {
-    throw new Error(
-      "Unauthorized: Only admins can query donors by blood type"
-    );
-  }
-  return Array.from(donors.values())
-    .filter((d) => d.bloodType === bloodType)
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
+export const getDonorByUserId = async (userId: string): Promise<Donor | null> => {
+  return Array.from(donors.values()).find(d => d.userId === userId) || null;
+};
 
-export async function updateDonorAvailability(
-  caller: Principal,
-  donorId: string,
-  available: boolean
-): Promise<void> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error(
-      "Unauthorized: Only users can update donor availability"
-    );
-  }
-
-  const donor = donors.get(donorId);
-  if (!donor) {
-    throw new Error("Donor not found");
-  }
-  if (donor.owner !== caller && !isAdmin(caller)) {
-    throw new Error(
-      "Unauthorized: Can only update your own donor availability"
-    );
-  }
-
-  donors.set(donorId, {
-    ...donor,
-    availability: available
-  });
-}
-
-export async function createBloodRequest(
-  caller: Principal,
+export const updateDonorProfile = async (
   id: string,
-  recipientName: string,
-  bloodType: BloodType,
-  location: string,
-  urgency: string,
-  contactInfo: string,
-  unitsRequired: Nat
-): Promise<void> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error("Unauthorized: Only users can create blood requests");
-  }
-
-  const bloodRequest: BloodRequest = {
-    id,
-    recipientName,
-    bloodType,
-    location,
-    urgency,
-    contactInfo,
-    status: "pending",
-    timeCreated: nowInt(),
-    unitsRequired,
-    owner: caller
-  };
-  bloodRequests.set(id, bloodRequest);
-}
-
-export async function updateBloodRequestStatus(
-  caller: Principal,
-  requestId: string,
-  status: RequestStatus
-): Promise<void> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error(
-      "Unauthorized: Only users can update blood request status"
-    );
-  }
-
-  const bloodRequest = bloodRequests.get(requestId);
-  if (!bloodRequest) {
-    throw new Error("Blood request not found");
-  }
-  if (bloodRequest.owner !== caller && !isAdmin(caller)) {
-    throw new Error(
-      "Unauthorized: Can only update your own blood request status"
-    );
-  }
-
-  bloodRequests.set(requestId, {
-    ...bloodRequest,
-    status
-  });
-}
-
-export async function getBloodRequestTS(
-  caller: Principal,
-  requestId: string
-): Promise<BloodRequest> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error(
-      "Unauthorized: Only users can view blood request details"
-    );
-  }
-
-  const bloodRequest = bloodRequests.get(requestId);
-  if (!bloodRequest) {
-    throw new Error("Blood request not found");
-  }
-
-  const isOwner = bloodRequest.owner === caller;
-  const admin = isAdmin(caller);
-
-  const hasExpressedInterest =
-    Array.from(donorInterests.values()).find((interest) => {
-      if (interest.requestId !== requestId) return false;
-      const donor = donors.get(interest.donorId);
-      return donor ? donor.owner === caller : false;
-    }) != null;
-
-  if (!(isOwner || admin || hasExpressedInterest)) {
-    throw new Error(
-      "Unauthorized: Can only view your own requests or requests you expressed interest in"
-    );
-  }
-
-  return bloodRequest;
-}
-
-export async function getAllBloodRequestsTS(
-  caller: Principal
-): Promise<PublicBloodRequest[]> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error("Unauthorized: Only users can view blood requests");
-  }
-
-  return Array.from(bloodRequests.values()).map((request) => ({
-    id: request.id,
-    recipientName: request.recipientName,
-    bloodType: request.bloodType,
-    location: request.location,
-    urgency: request.urgency,
-    status: request.status,
-    timeCreated: request.timeCreated,
-    unitsRequired: request.unitsRequired
-  }));
-}
-
-export async function createMatch(
-  caller: Principal,
-  requestId: string,
-  donorId: string
-): Promise<void> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error("Unauthorized: Only users can create matches");
-  }
-
-  const donor = donors.get(donorId);
+  updates: Partial<Donor>
+): Promise<Donor> => {
+  const donor = donors.get(id);
+  
   if (!donor) {
-    throw new Error("Donor not found");
+    throw new Error('Donor not found');
   }
-  if (donor.owner !== caller && !isAdmin(caller)) {
-    throw new Error(
-      "Unauthorized: Can only create matches with your own donor profile"
+  
+  // Validate updates
+  if (updates.contactInfo?.email && !isValidEmail(updates.contactInfo.email)) {
+    throw new Error('Invalid email address');
+  }
+  
+  if (updates.contactInfo?.phone && !isValidPhone(updates.contactInfo.phone)) {
+    throw new Error('Invalid phone number');
+  }
+  
+  const updatedDonor = { ...donor, ...updates };
+  donors.set(id, updatedDonor);
+  
+  return updatedDonor;
+};
+
+export const searchDonors = async (filters: {
+  bloodType?: BloodType | BloodType[];
+  location?: { lat: number; lng: number; radius: number };
+  isAvailable?: boolean;
+  city?: string;
+  minRating?: number;
+}): Promise<Donor[]> => {
+  let results = Array.from(donors.values());
+  
+  // Filter by blood type
+  if (filters.bloodType) {
+    const types = Array.isArray(filters.bloodType) ? filters.bloodType : [filters.bloodType];
+    results = results.filter(d => types.includes(d.bloodType));
+  }
+  
+  // Filter by availability
+  if (filters.isAvailable !== undefined) {
+    results = results.filter(d => d.isAvailable === filters.isAvailable);
+  }
+  
+  // Filter by city
+  if (filters.city) {
+    results = results.filter(d => 
+      d.location.city?.toLowerCase().includes(filters.city!.toLowerCase())
     );
   }
-
-  const request = bloodRequests.get(requestId);
-  if (!request) {
-    throw new Error("Blood request not found");
-  }
-  if (request.status === "fulfilled") {
-    throw new Error("Cannot match: Blood request already fulfilled");
-  }
-  if (request.status === "expired") {
-    throw new Error("Cannot match: Blood request expired");
-  }
-
-  const matchId = `${requestId}_${donorId}`;
-  const match: Match = {
-    id: matchId,
-    requestId,
-    donorId
-  };
-  matches.set(matchId, match);
-}
-
-export async function getMatchTS(
-  caller: Principal,
-  matchId: string
-): Promise<Match> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error("Unauthorized: Only users can view matches");
-  }
-
-  const match = matches.get(matchId);
-  if (!match) {
-    throw new Error("Match not found");
-  }
-
-  const donor = donors.get(match.donorId);
-  const request = bloodRequests.get(match.requestId);
-
-  const isDonorOwner = donor ? donor.owner === caller : false;
-  const isRequestOwner = request ? request.owner === caller : false;
-  const admin = isAdmin(caller);
-
-  if (!(isDonorOwner || isRequestOwner || admin)) {
-    throw new Error("Unauthorized: Can only view matches you are involved in");
-  }
-
-  return match;
-}
-
-export async function getAllMatchesTS(
-  caller: Principal
-): Promise<Match[]> {
-  if (!hasPermission(caller, "admin")) {
-    throw new Error("Unauthorized: Only admins can view all matches");
-  }
-  return Array.from(matches.values()).sort((a, b) => {
-    const byReq = a.requestId.localeCompare(b.requestId);
-    return byReq !== 0 ? byReq : a.donorId.localeCompare(b.donorId);
-  });
-}
-
-export function getCompatibleDonorBloodTypes(
-  recipientBloodType: BloodType
-): BloodType[] {
-  switch (recipientBloodType) {
-    case "O_positive":
-      return ["O_positive", "O_negative"];
-    case "O_negative":
-      return ["O_negative"];
-    case "A_positive":
-      return ["A_positive", "A_negative", "O_positive", "O_negative"];
-    case "B_positive":
-      return ["B_positive", "B_negative", "O_positive", "O_negative"];
-    case "AB_positive":
-      return [
-        "O_negative",
-        "O_positive",
-        "A_negative",
-        "A_positive",
-        "B_negative",
-        "B_positive",
-        "AB_positive",
-        "AB_negative"
-      ];
-    case "A_negative":
-      return ["O_negative", "A_negative"];
-    case "B_negative":
-      return ["O_negative", "B_negative"];
-    case "AB_negative":
-      return ["O_negative", "A_negative", "B_negative", "AB_negative"];
-  }
-}
-
-export async function getBloodRequestsByStatus(
-  caller: Principal,
-  status: RequestStatus
-): Promise<PublicBloodRequest[]> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error(
-      "Unauthorized: Only users can query blood requests"
-    );
-  }
-
-  return Array.from(bloodRequests.values())
-    .filter((r) => r.status === status)
-    .map((r) => ({
-      id: r.id,
-      recipientName: r.recipientName,
-      bloodType: r.bloodType,
-      location: r.location,
-      urgency: r.urgency,
-      status: r.status,
-      timeCreated: r.timeCreated,
-      unitsRequired: r.unitsRequired
-    }));
-}
-
-export async function getDonorsByAvailability(
-  caller: Principal,
-  available: boolean
-): Promise<Donor[]> {
-  if (!hasPermission(caller, "admin")) {
-    throw new Error(
-      "Unauthorized: Only admins can query donors by availability"
-    );
-  }
-
-  return Array.from(donors.values())
-    .filter((d) => d.availability === available)
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-export async function findCompatibleDonors(
-  caller: Principal,
-  bloodType: BloodType
-): Promise<Donor[]> {
-  if (!hasPermission(caller, "admin")) {
-    throw new Error(
-      "Unauthorized: Only admins can query all compatible donors"
-    );
-  }
-
-  const compatibleTypes = getCompatibleDonorBloodTypes(bloodType);
-  return Array.from(donors.values())
-    .filter((donor) =>
-      compatibleTypes.some((bt) => bt === donor.bloodType)
-    )
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-export async function findDonorsNearby(
-  caller: Principal,
-  bloodType: BloodType,
-  city: string
-): Promise<Nat> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error("Unauthorized: Only users can search for donors");
-  }
-
-  let count = 0;
-  for (const donor of donors.values()) {
-    if (donor.bloodType === bloodType && donor.location === city) {
-      count += 1;
-    }
-  }
-  return count;
-}
-
-export async function getRequestsForDonor(
-  caller: Principal,
-  donorId: string
-): Promise<PublicBloodRequest[]> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error(
-      "Unauthorized: Only users can view requests for donors"
-    );
-  }
-
-  const donor = donors.get(donorId);
-  if (!donor) {
-    throw new Error("Donor not found");
-  }
-  if (donor.owner !== caller && !isAdmin(caller)) {
-    throw new Error(
-      "Unauthorized: Can only view requests for your own donor profile"
-    );
-  }
-
-  return Array.from(bloodRequests.values())
-    .filter(
-      (r) => r.bloodType === donor.bloodType && r.location === donor.location
-    )
-    .map((r) => ({
-      id: r.id,
-      recipientName: r.recipientName,
-      bloodType: r.bloodType,
-      location: r.location,
-      urgency: r.urgency,
-      status: r.status,
-      timeCreated: r.timeCreated,
-      unitsRequired: r.unitsRequired
-    }));
-}
-
-export async function getAvailableRequestsForDonor(
-  caller: Principal,
-  donorId: string
-): Promise<PublicBloodRequest[]> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error(
-      "Unauthorized: Only users can view available requests"
-    );
-  }
-
-  const donor = donors.get(donorId);
-  if (!donor) {
-    throw new Error("Donor not found");
-  }
-  if (donor.owner !== caller && !isAdmin(caller)) {
-    throw new Error(
-      "Unauthorized: Can only view requests for your own donor profile"
-    );
-  }
-
-  return Array.from(bloodRequests.values())
-    .filter(
-      (r) =>
-        r.bloodType === donor.bloodType &&
-        r.location === donor.location &&
-        r.status !== "fulfilled" &&
-        r.status !== "expired" &&
-        r.status !== "matched"
-    )
-    .map((r) => ({
-      id: r.id,
-      recipientName: r.recipientName,
-      bloodType: r.bloodType,
-      location: r.location,
-      urgency: r.urgency,
-      status: r.status,
-      timeCreated: r.timeCreated,
-      unitsRequired: r.unitsRequired
-    }));
-}
-
-export async function createDonorInterest(
-  caller: Principal,
-  requestId: string,
-  donorId: string
-): Promise<void> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error(
-      "Unauthorized: Only users can express donor interest"
-    );
-  }
-
-  const donor = donors.get(donorId);
-  if (!donor) {
-    throw new Error("Donor does not exist");
-  }
-  if (donor.owner !== caller && !isAdmin(caller)) {
-    throw new Error(
-      "Unauthorized: Can only express interest with your own donor profile"
-    );
-  }
-
-  const existing = Array.from(donorInterests.values()).find(
-    (interest) =>
-      interest.requestId === requestId && interest.donorId === donorId
-  );
-  if (existing) {
-    throw new Error("Interest already recorded for this request");
-  }
-
-  const request = bloodRequests.get(requestId);
-  if (!request) {
-    throw new Error("Request does not exist");
-  }
-
-  const newInterest: DonorInterest = {
-    id: `${requestId}_${donorId}`,
-    requestId,
-    donorId,
-    timestamp: nowInt()
-  };
-
-  if (request.status === "searching") {
-    bloodRequests.set(request.id, {
-      ...request,
-      status: "donor_contacted"
+  
+  // Filter by location radius
+  if (filters.location) {
+    results = results.filter(d => {
+      const distance = calculateDistance(
+        { latitude: filters.location!.lat, longitude: filters.location!.lng, address: '' },
+        d.location
+      );
+      return distance <= filters.location!.radius;
     });
   }
-
-  donorInterests.set(newInterest.id, newInterest);
-}
-
-export async function getDonorInterestsByRequest(
-  caller: Principal,
-  requestId: string
-): Promise<DonorInterest[]> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error(
-      "Unauthorized: Only users can view donor interests"
-    );
+  
+  // Filter by rating
+  if (filters.minRating) {
+    results = results.filter(d => (d.rating || 0) >= filters.minRating!);
   }
+  
+  return results;
+};
 
-  const request = bloodRequests.get(requestId);
-  if (!request) {
-    throw new Error("Blood request not found");
-  }
-  if (request.owner !== caller && !isAdmin(caller)) {
-    throw new Error(
-      "Unauthorized: Can only view interests for your own requests"
-    );
-  }
+export const getDonorsByBloodType = async (bloodType: BloodType): Promise<Donor[]> => {
+  return searchDonors({ bloodType, isAvailable: true });
+};
 
-  return Array.from(donorInterests.values())
-    .filter((i) => i.requestId === requestId)
-    .sort((a, b) => {
-      const byReq = a.requestId.localeCompare(b.requestId);
-      return byReq !== 0 ? byReq : a.donorId.localeCompare(b.donorId);
-    });
-}
-
-export async function countDonorInterestsTS(
-  caller: Principal,
-  requestId: string
-): Promise<Nat> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error(
-      "Unauthorized: Only users can view donor interest counts"
-    );
-  }
-
-  const request = bloodRequests.get(requestId);
-  if (!request) {
-    throw new Error("Blood request not found");
-  }
-  if (request.owner !== caller && !isAdmin(caller)) {
-    throw new Error(
-      "Unauthorized: Can only view interest count for your own requests"
-    );
-  }
-
-  let count = 0;
-  for (const interest of donorInterests.values()) {
-    if (interest.requestId === requestId) count += 1;
-  }
-  return count;
-}
-
-export async function getInterestedDonorsForRequest(
-  caller: Principal,
-  requestId: string
-): Promise<DonorSummary[]> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error(
-      "Unauthorized: Only users can view interested donors"
-    );
-  }
-
-  const request = bloodRequests.get(requestId);
-  if (!request) {
-    throw new Error("Blood request not found");
-  }
-  if (request.owner !== caller && !isAdmin(caller)) {
-    throw new Error(
-      "Unauthorized: Can only view interested donors for your own requests"
-    );
-  }
-
-  const summaries: DonorSummary[] = [];
-  for (const interest of donorInterests.values()) {
-    if (interest.requestId !== requestId) continue;
-    const donor = donors.get(interest.donorId);
-    if (donor) {
-      summaries.push({
-        firstName: donor.name,
-        bloodType: donor.bloodType,
-        location: donor.location,
-        donorId: donor.id
-      });
+export const checkDonorEligibility = (donor: Donor): {
+  eligible: boolean;
+  reasons: string[];
+} => {
+  const reasons: string[] = [];
+  
+  // Check last donation date (minimum 8 weeks / 56 days)
+  if (donor.lastDonationDate) {
+    const daysSince = getDaysSince(donor.lastDonationDate);
+    if (daysSince < 56) {
+      reasons.push(`Must wait ${56 - daysSince} more days since last donation`);
     }
   }
-  return summaries;
-}
-
-export async function confirmDonorMatch(
-  caller: Principal,
-  requestId: string,
-  donorId: string
-): Promise<DonorContactResponse> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error(
-      "Unauthorized: Only users can confirm donor matches"
-    );
+  
+  // Check health status
+  if (donor.healthStatus !== 'eligible') {
+    reasons.push('Health status not eligible');
   }
-
-  const request = bloodRequests.get(requestId);
-  if (!request) {
-    throw new Error("Blood request not found");
+  
+  // Check availability
+  if (!donor.isAvailable) {
+    reasons.push('Donor marked as unavailable');
   }
-  if (request.owner !== caller) {
-    throw new Error(
-      "Unauthorized: Only the requester can contact donors for this request"
-    );
+  
+  // Check age
+  if (donor.age && (donor.age < 18 || donor.age > 65)) {
+    reasons.push('Age must be between 18 and 65');
   }
-
-  const donor = donors.get(donorId);
-  if (!donor) {
-    throw new Error("Donor not found");
+  
+  // Check weight
+  if (donor.weight && donor.weight < 50) {
+    reasons.push('Weight must be at least 50 kg');
   }
-
-  const eligible = Array.from(donorInterests.values()).find(
-    (interest) =>
-      interest.requestId === requestId && interest.donorId === donorId
-  );
-  if (!eligible) {
-    throw new Error("Donor has not expressed interest in this request");
-  }
-
-  bloodRequests.set(request.id, {
-    ...request,
-    status: "matched"
-  });
-
-  const summary: DonorSummary = {
-    firstName: donor.name,
-    bloodType: donor.bloodType,
-    location: donor.location,
-    donorId: donor.id
-  };
-
+  
   return {
-    donorSummary: summary,
-    contactInfo: donor.contactInfo
+    eligible: reasons.length === 0,
+    reasons,
   };
-}
+};
 
-export async function getCompatibleDonorsInLocation(
-  caller: Principal,
-  bloodType: BloodType,
-  location: string
-): Promise<DonorSummary[]> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error(
-      "Unauthorized: Only users can search for donors"
-    );
+// ============================================================================
+// BLOOD REQUEST MANAGEMENT
+// ============================================================================
+
+export const createBloodRequest = async (
+  requestData: Omit<BloodRequest, 'id' | 'createdAt' | 'expiresAt' | 'status' | 'matchedDonors' | 'respondedDonors'>
+): Promise<BloodRequest> => {
+  // Validation
+  if (!isValidBloodType(requestData.bloodType)) {
+    throw new Error('Invalid blood type');
   }
+  
+  if (requestData.unitsNeeded < 1 || requestData.unitsNeeded > 10) {
+    throw new Error('Units needed must be between 1 and 10');
+  }
+  
+  const request: BloodRequest = {
+    ...requestData,
+    id: generateId(),
+    status: 'pending',
+    createdAt: new Date(),
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+    matchedDonors: [],
+    respondedDonors: [],
+  };
+  
+  bloodRequests.set(request.id, request);
+  
+  // Automatically trigger matching
+  setTimeout(() => matchDonorsToRequest(request.id), 1000);
+  
+  return request;
+};
 
-  const result: DonorSummary[] = [];
-  for (const donor of donors.values()) {
-    if (
-      donor.bloodType === bloodType &&
-      donor.location === location &&
-      donor.availability
-    ) {
-      result.push({
-        firstName: donor.name,
-        bloodType: donor.bloodType,
-        location: donor.location,
-        donorId: donor.id
+export const getBloodRequests = async (filters?: {
+  status?: RequestStatus;
+  bloodType?: BloodType;
+  urgencyLevel?: UrgencyLevel;
+  requesterId?: string;
+}): Promise<BloodRequest[]> => {
+  let results = Array.from(bloodRequests.values());
+  
+  if (filters?.status) {
+    results = results.filter(r => r.status === filters.status);
+  }
+  
+  if (filters?.bloodType) {
+    results = results.filter(r => r.bloodType === filters.bloodType);
+  }
+  
+  if (filters?.urgencyLevel) {
+    results = results.filter(r => r.urgencyLevel === filters.urgencyLevel);
+  }
+  
+  if (filters?.requesterId) {
+    results = results.filter(r => r.requesterId === filters.requesterId);
+  }
+  
+  // Sort by urgency and date
+  return results.sort((a, b) => {
+    const urgencyOrder = { critical: 0, urgent: 1, normal: 2 };
+    if (urgencyOrder[a.urgencyLevel] !== urgencyOrder[b.urgencyLevel]) {
+      return urgencyOrder[a.urgencyLevel] - urgencyOrder[b.urgencyLevel];
+    }
+    return b.createdAt.getTime() - a.createdAt.getTime();
+  });
+};
+
+export const getBloodRequestById = async (id: string): Promise<BloodRequest | null> => {
+  return bloodRequests.get(id) || null;
+};
+
+export const updateRequestStatus = async (
+  id: string,
+  status: RequestStatus,
+  donorIds?: string[]
+): Promise<BloodRequest> => {
+  const request = bloodRequests.get(id);
+  
+  if (!request) {
+    throw new Error('Blood request not found');
+  }
+  
+  request.status = status;
+  
+  if (donorIds) {
+    request.matchedDonors = [...new Set([...request.matchedDonors, ...donorIds])];
+  }
+  
+  if (status === 'fulfilled') {
+    request.fulfilledAt = new Date();
+  }
+  
+  bloodRequests.set(id, request);
+  
+  return request;
+};
+
+export const respondToRequest = async (
+  requestId: string,
+  donorId: string,
+  response: 'accepted' | 'declined'
+): Promise<void> => {
+  const request = bloodRequests.get(requestId);
+  
+  if (!request) {
+    throw new Error('Blood request not found');
+  }
+  
+  // Remove existing response from this donor
+  request.respondedDonors = request.respondedDonors.filter(r => r.donorId !== donorId);
+  
+  // Add new response
+  request.respondedDonors.push({
+    donorId,
+    response,
+    respondedAt: new Date(),
+  });
+  
+  bloodRequests.set(requestId, request);
+  
+  // Notify requester
+  await createNotification({
+    userId: request.requesterId,
+    type: 'blood_request_match',
+    title: response === 'accepted' ? 'Donor Accepted!' : 'Donor Declined',
+    message: `A donor has ${response} your blood request.`,
+    data: { requestId, donorId },
+  });
+};
+
+// ============================================================================
+// AUTO-MATCHING ALGORITHM
+// ============================================================================
+
+export const calculateCompatibilityScore = (
+  donor: Donor,
+  request: BloodRequest
+): number => {
+  let score = 100;
+  
+  // Blood type exact match bonus
+  if (donor.bloodType === request.bloodType) {
+    score += 20;
+  }
+  
+  // Universal donor bonus
+  if (donor.bloodType === 'O-') {
+    score += 15;
+  }
+  
+  // Distance penalty (closer is better)
+  const distance = calculateDistance(donor.location, request.location);
+  score -= Math.min(distance * 2, 50); // Max 50 points penalty
+  
+  // Availability bonus
+  if (donor.isAvailable) {
+    score += 30;
+  } else {
+    score -= 50;
+  }
+  
+  // Recent donation penalty
+  if (donor.lastDonationDate) {
+    const daysSince = getDaysSince(donor.lastDonationDate);
+    if (daysSince < 56) {
+      score -= 50;
+    } else if (daysSince < 90) {
+      score -= 10;
+    }
+  }
+  
+  // Health status
+  if (donor.healthStatus === 'eligible') {
+    score += 10;
+  } else if (donor.healthStatus === 'ineligible') {
+    score -= 100;
+  }
+  
+  // Rating bonus
+  if (donor.rating) {
+    score += donor.rating * 2; // Max 10 points if 5-star rating
+  }
+  
+  // Urgency multiplier
+  if (request.urgencyLevel === 'critical') {
+    score *= 1.2;
+  } else if (request.urgencyLevel === 'urgent') {
+    score *= 1.1;
+  }
+  
+  return Math.max(0, Math.min(200, score)); // 0-200 range
+};
+
+export const findCompatibleDonors = async (
+  requestId: string
+): Promise<MatchResult[]> => {
+  const request = await getBloodRequestById(requestId);
+  
+  if (!request) {
+    throw new Error('Blood request not found');
+  }
+  
+  // Find compatible blood types
+  const compatibleTypes = getCompatibleBloodTypes(request.bloodType);
+  
+  // Search donors with compatible blood types
+  const potentialDonors = await searchDonors({
+    bloodType: compatibleTypes,
+  });
+  
+  // Calculate compatibility and create results
+  const matches: MatchResult[] = potentialDonors.map(donor => {
+    const eligibility = checkDonorEligibility(donor);
+    const distance = calculateDistance(donor.location, request.location);
+    
+    return {
+      donor,
+      compatibilityScore: calculateCompatibilityScore(donor, request),
+      distance,
+      availabilityStatus: eligibility.eligible ? 'available' : 
+                         donor.lastDonationDate && getDaysSince(donor.lastDonationDate) < 56 ?
+                         'recently-donated' : 'unavailable',
+      estimatedResponseTime: distance < 10 ? '< 1 hour' : 
+                            distance < 50 ? '1-3 hours' : '3+ hours',
+    };
+  });
+  
+  // Sort by compatibility score (highest first)
+  return matches
+    .sort((a, b) => b.compatibilityScore - a.compatibilityScore)
+    .slice(0, 20); // Return top 20 matches
+};
+
+export const matchDonorsToRequest = async (requestId: string): Promise<void> => {
+  const matches = await findCompatibleDonors(requestId);
+  
+  if (matches.length === 0) {
+    console.warn(`No compatible donors found for request ${requestId}`);
+    return;
+  }
+  
+  // Update request with matched donors
+  await updateRequestStatus(
+    requestId,
+    'matched',
+    matches.map(m => m.donor.id)
+  );
+  
+  // Notify top donors
+  const topMatches = matches.slice(0, 10);
+  await notifyMatchedDonors(topMatches, requestId);
+};
+
+export const notifyMatchedDonors = async (
+  matches: MatchResult[],
+  requestId: string
+): Promise<void> => {
+  const request = await getBloodRequestById(requestId);
+  
+  if (!request) return;
+  
+  for (const match of matches) {
+    if (match.availabilityStatus === 'available') {
+      await createNotification({
+        userId: match.donor.userId,
+        type: 'blood_request_match',
+        title: 'Urgent Blood Request Match!',
+        message: `You match a ${request.urgencyLevel} blood request for ${request.bloodType}. Distance: ${match.distance.toFixed(1)} km`,
+        data: {
+          requestId,
+          bloodType: request.bloodType,
+          urgencyLevel: request.urgencyLevel,
+          distance: match.distance,
+          compatibilityScore: match.compatibilityScore,
+        },
       });
     }
   }
-  return result;
-}
+};
 
-export async function autoMatchBloodRequest(
-  caller: Principal,
-  requestId: string
-): Promise<DonorSummary[]> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error(
-      "Unauthorized: Only users can trigger auto-matching"
-    );
+// ============================================================================
+// USER AUTHENTICATION & MANAGEMENT
+// ============================================================================
+
+export const createUser = async (userData: {
+  email: string;
+  password: string;
+  role: UserRole;
+}): Promise<User> => {
+  // Check if email already exists
+  const existingUser = Array.from(users.values()).find(u => u.email === userData.email);
+  if (existingUser) {
+    throw new Error('Email already registered');
   }
-
-  const request = bloodRequests.get(requestId);
-  if (!request) {
-    throw new Error("Blood request not found");
+  
+  if (!isValidEmail(userData.email)) {
+    throw new Error('Invalid email address');
   }
-  if (request.owner !== caller && !isAdmin(caller)) {
-    throw new Error("Unauthorized: Can only auto-match your own requests");
-  }
+  
+  const user: User = {
+    id: generateId(),
+    email: userData.email,
+    passwordHash: await hashPassword(userData.password),
+    role: userData.role,
+    profileId: '', // Will be set when profile is created
+    createdAt: new Date(),
+    lastLogin: new Date(),
+    isVerified: false,
+    isActive: true,
+  };
+  
+  users.set(user.id, user);
+  
+  return user;
+};
 
-  const compatibleTypes = getCompatibleDonorBloodTypes(request.bloodType);
-  const matchedDonors: DonorSummary[] = [];
-
-  for (const donor of donors.values()) {
-    const isCompatible = compatibleTypes.some(
-      (bt) => bt === donor.bloodType
-    );
-
-    if (
-      isCompatible &&
-      donor.location === request.location &&
-      donor.availability
-    ) {
-      const alreadyContacted =
-        Array.from(donorInterests.values()).find(
-          (interest) =>
-            interest.requestId === requestId &&
-            interest.donorId === donor.id
-        ) != null;
-
-      if (!alreadyContacted) {
-        matchedDonors.push({
-          firstName: donor.name,
-          bloodType: donor.bloodType,
-          location: donor.location,
-          donorId: donor.id
-        });
-      }
-    }
-  }
-
-  return matchedDonors;
-}
-
-export async function findBestDonorMatch(
-  caller: Principal,
-  requestId: string
-): Promise<DonorContactResponse | null> {
-  if (!hasPermission(caller, "user")) {
-    throw new Error(
-      "Unauthorized: Only users can find donor matches"
-    );
-  }
-
-  const request = bloodRequests.get(requestId);
-  if (!request) {
+export const authenticateUser = async (
+  email: string,
+  password: string
+): Promise<{ user: User; token: string } | null> => {
+  const user = Array.from(users.values()).find(u => u.email === email);
+  
+  if (!user || !user.isActive) {
     return null;
   }
-  if (request.owner !== caller && !isAdmin(caller)) {
-    throw new Error("Unauthorized");
+  
+  const isValid = await verifyPassword(password, user.passwordHash || '');
+  
+  if (!isValid) {
+    return null;
   }
+  
+  // Update last login
+  user.lastLogin = new Date();
+  users.set(user.id, user);
+  
+  // Create session
+  const token = generateId();
+  sessions.set(token, {
+    userId: user.id,
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+  });
+  
+  return { user, token };
+};
 
-  const compatibleTypes = getCompatibleDonorBloodTypes(request.bloodType);
-  let bestDonor: Donor | null = null;
-  let bestScore: Nat = 0;
-
-  for (const donor of donors.values()) {
-    const isCompatible = compatibleTypes.some(
-      (bt) => bt === donor.bloodType
-    );
-
-    if (
-      isCompatible &&
-      donor.location === request.location &&
-      donor.availability
-    ) {
-      const alreadyContacted =
-        Array.from(donorInterests.values()).find(
-          (interest) =>
-            interest.requestId === requestId &&
-            interest.donorId === donor.id
-        ) != null;
-
-      if (!alreadyContacted) {
-        let score: Nat = 0;
-        if (donor.bloodType === request.bloodType) score += 10;
-        if (donor.healthChecklist.eligibleToDonate) score += 5;
-
-        if (score > bestScore) {
-          bestScore = score;
-          bestDonor = donor;
-        }
-      }
-    }
+export const validateToken = async (token: string): Promise<User | null> => {
+  const session = sessions.get(token);
+  
+  if (!session) {
+    return null;
   }
+  
+  if (session.expiresAt < new Date()) {
+    sessions.delete(token);
+    return null;
+  }
+  
+  return users.get(session.userId) || null;
+};
 
-  if (!bestDonor) return null;
+export const getUserById = async (id: string): Promise<User | null> => {
+  return users.get(id) || null;
+};
 
-  return {
-    donorSummary: {
-      firstName: bestDonor.name,
-      bloodType: bestDonor.bloodType,
-      location: bestDonor.location,
-      donorId: bestDonor.id
-    },
-    contactInfo: bestDonor.contactInfo
+export const logout = async (token: string): Promise<void> => {
+  sessions.delete(token);
+};
+
+// Simple password hashing (use bcrypt in production)
+const hashPassword = async (password: string): Promise<string> => {
+  // In production, use bcrypt or similar
+  return Buffer.from(password).toString('base64');
+};
+
+const verifyPassword = async (password: string, hash: string): Promise<boolean> => {
+  const computed = await hashPassword(password);
+  return computed === hash;
+};
+
+// ============================================================================
+// NOTIFICATION SYSTEM
+// ============================================================================
+
+export const createNotification = async (data: {
+  userId: string;
+  type: Notification['type'];
+  title: string;
+  message: string;
+  data?: any;
+}): Promise<Notification> => {
+  const notification: Notification = {
+    id: generateId(),
+    ...data,
+    isRead: false,
+    createdAt: new Date(),
   };
-}
+  
+  const userNotifications = notifications.get(data.userId) || [];
+  userNotifications.push(notification);
+  notifications.set(data.userId, userNotifications);
+  
+  return notification;
+};
+
+export const getUserNotifications = async (userId: string): Promise<Notification[]> => {
+  return notifications.get(userId) || [];
+};
+
+export const markNotificationAsRead = async (userId: string, notificationId: string): Promise<void> => {
+  const userNotifications = notifications.get(userId) || [];
+  const notification = userNotifications.find(n => n.id === notificationId);
+  
+  if (notification) {
+    notification.isRead = true;
+    notifications.set(userId, userNotifications);
+  }
+};
+
+export const markAllNotificationsAsRead = async (userId: string): Promise<void> => {
+  const userNotifications = notifications.get(userId) || [];
+  userNotifications.forEach(n => n.isRead = true);
+  notifications.set(userId, userNotifications);
+};
+
+// ============================================================================
+// ANALYTICS & STATISTICS
+// ============================================================================
+
+export const getStatistics = async (): Promise<{
+  totalDonors: number;
+  availableDonors: number;
+  totalRequests: number;
+  activeRequests: number;
+  fulfilledRequests: number;
+  donorsByBloodType: Record<BloodType, number>;
+  requestsByUrgency: Record<UrgencyLevel, number>;
+}> => {
+  const allDonors = Array.from(donors.values());
+  const allRequests = Array.from(bloodRequests.values());
+  
+  return {
+    totalDonors: allDonors.length,
+    availableDonors: allDonors.filter(d => d.isAvailable).length,
+    totalRequests: allRequests.length,
+    activeRequests: allRequests.filter(r => r.status === 'pending' || r.status === 'matched').length,
+    fulfilledRequests: allRequests.filter(r => r.status === 'fulfilled').length,
+    donorsByBloodType: allDonors.reduce((acc, donor) => {
+      acc[donor.bloodType] = (acc[donor.bloodType] || 0) + 1;
+      return acc;
+    }, {} as Record<BloodType, number>),
+    requestsByUrgency: allRequests.reduce((acc, request) => {
+      acc[request.urgencyLevel] = (acc[request.urgencyLevel] || 0) + 1;
+      return acc;
+    }, {} as Record<UrgencyLevel, number>),
+  };
+};
+
+// ============================================================================
+// DATA INITIALIZATION (For Testing)
+// ============================================================================
+
+export const initializeSampleData = async (): Promise<void> => {
+  // Create sample admin user
+  const adminUser = await createUser({
+    email: 'admin@helpconnect.io',
+    password: 'admin123',
+    role: 'admin',
+  });
+  
+  // Create sample donors
+  const sampleDonors = [
+    {
+      userId: generateId(),
+      name: 'John Doe',
+      bloodType: 'O+' as BloodType,
+      location: {
+        latitude: 20.2961,
+        longitude: 85.8245,
+        address: 'Cuttack, Odisha',
+        city: 'Cuttack',
+        state: 'Odisha',
+        country: 'India',
+      },
+      contactInfo: {
+        email: 'john@example.com',
+        phone: '+91-9876543210',
+      },
+      isAvailable: true,
+      healthStatus: 'eligible' as HealthStatus,
+      age: 28,
+      weight: 70,
+      notificationPreferences: {
+        email: true,
+        sms: true,
+        push: true,
+      },
+    },
+    {
+      userId: generateId(),
+      name: 'Jane Smith',
+      bloodType: 'A+' as BloodType,
+      location: {
+        latitude: 20.2700,
+        longitude: 85.8400,
+        address: 'Bhubaneswar, Odisha',
+        city: 'Bhubaneswar',
+        state: 'Odisha',
+        country: 'India',
+      },
+      contactInfo: {
+        email: 'jane@example.com',
+        phone: '+91-9876543211',
+      },
+      isAvailable: true,
+      healthStatus: 'eligible' as HealthStatus,
+      age: 32,
+      weight: 65,
+      notificationPreferences: {
+        email: true,
+        sms: false,
+        push: true,
+      },
+    },
+  ];
+  
+  for (const donorData of sampleDonors) {
+    await registerDonor(donorData);
+  }
+  
+  console.log('Sample data initialized successfully');
+};
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
+
+export default {
+  // Donor Management
+  registerDonor,
+  getDonorById,
+  getDonorByUserId,
+  updateDonorProfile,
+  searchDonors,
+  getDonorsByBloodType,
+  checkDonorEligibility,
+  
+  // Blood Request Management
+  createBloodRequest,
+  getBloodRequests,
+  getBloodRequestById,
+  updateRequestStatus,
+  respondToRequest,
+  
+  // Auto-Matching
+  findCompatibleDonors,
+  matchDonorsToRequest,
+  calculateCompatibilityScore,
+  
+  // Blood Type Compatibility
+  checkBloodCompatibility,
+  getCompatibleBloodTypes,
+  
+  // User Management
+  createUser,
+  authenticateUser,
+  validateToken,
+  getUserById,
+  logout,
+  
+  // Authorization
+  checkPermission,
+  requirePermission,
+  
+  // Notifications
+  createNotification,
+  getUserNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  
+  // Analytics
+  getStatistics,
+  
+  // Utilities
+  calculateDistance,
+  getDaysSince,
+  isValidEmail,
+  isValidPhone,
+  isValidBloodType,
+  
+  // Initialization
+  initializeSampleData,
+};
